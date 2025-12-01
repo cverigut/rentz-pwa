@@ -438,6 +438,7 @@ function renderGamesTable(){
       const tdTotal = document.createElement('td');
       const inpTotal = document.createElement('input');
       inpTotal.type = 'number';
+      inpTotal.inputMode = 'numeric';
       inpTotal.value = g.total || 0;
       inpTotal.min = '0';
       inpTotal.addEventListener('input',()=>{ g.total = Number(inpTotal.value||0); updateRoundsSummary(); });
@@ -472,6 +473,7 @@ function renderGamesTable(){
         const tdTotal = document.createElement('td');
         const inp = document.createElement('input');
         inp.type = 'number';
+      inp.inputMode = 'numeric';
         inp.min = '0';
         inp.value = g.rentzValues[place-1] || 0;
         inp.addEventListener('input',()=>{
@@ -634,6 +636,7 @@ function openScoresModal(game){
       const right = document.createElement('div');
       const inp = document.createElement('input');
       inp.type = 'number';
+      inp.inputMode = 'numeric';
       inp.min = '1';
       inp.max = '6';
       inp.placeholder = 'loc (1-6)';
@@ -652,6 +655,7 @@ function openScoresModal(game){
       const right = document.createElement('div');
       const inp = document.createElement('input');
       inp.type = 'number';
+      inp.inputMode = 'numeric';
       inp.min = '0';
       inp.placeholder = '0';
       inp.dataset.index = idx;
