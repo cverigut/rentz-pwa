@@ -214,7 +214,7 @@ const STORAGE_KEY = 'rentz_match_state_v1';
 
 function saveMatchState(){
   try{
-    if(typeof localStorage === 'undefined') return;
+    if(typeof localStorage === 'undefined') return;exportFinalPDF
     const simplePicks = {};
     Object.keys(picksByPlayer || {}).forEach(k=>{
       simplePicks[k] = Array.from(picksByPlayer[k] || []);
@@ -810,7 +810,7 @@ function exportFinalPDF(){
 
     const doc = new jsPDFCtor();
 
-    const title = 'Rentz – Clasament Final';
+    const title = 'Rentz - Clasament Final';
     const today = new Date().toLocaleDateString('ro-RO');
 
     doc.setFontSize(18);
@@ -820,7 +820,7 @@ function exportFinalPDF(){
     doc.text('Data: ' + today, 105, 28, { align: 'center' });
 
     doc.setFontSize(12);
-    doc.text('Număr jucători: ' + players.length, 14, 40);
+    doc.text('Numar jucatori: ' + players.length, 14, 40);
     doc.text('Runde totale: ' + totalRounds, 14, 47);
 
     doc.setFontSize(14);
@@ -835,12 +835,12 @@ function exportFinalPDF(){
 
     ranking.forEach((r, i) => {
       const scoreTxt = (r.score > 0 ? '+' : '') + r.score;
-      doc.text((i + 1) + '. ' + r.name + ' — ' + scoreTxt, 14, y);
+      doc.text((i + 1) + '. ' + r.name + ' - ' + scoreTxt, 14, y);
       y += 8;
     });
 
     doc.setFontSize(10);
-    doc.text('Clasament generat automat de aplicația Rentz Scoruri', 105, 285, { align: 'center' });
+    doc.text('Clasament generat automat de aplicatia Rentz Scoruri', 105, 285, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
     const pdfUrl = URL.createObjectURL(pdfBlob);
