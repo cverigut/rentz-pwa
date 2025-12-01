@@ -60,6 +60,7 @@
     .modal-backdrop.hidden{display:none !important;}
     .modal{background:#fff;border-radius:14px;padding:14px;max-width:420px;width:100%;box-shadow:0 20px 35px rgba(15,23,42,0.2)}
   </style>
+  <script src="./jspdf.umd.min.js"></script>
 </head>
 <body>
 <header>
@@ -173,6 +174,7 @@
       <button class="btn ghost small" id="btnBackToMatch">Înapoi la meci</button>
     </div>
     <div id="scoreTableWrap" style="margin-top:6px"></div>
+    <button class="btn primary small" id="btnExportPDF" style="margin-top:10px;">📄 Exportă Clasament Final (PDF)</button>
   </div>
 
 </div>
@@ -340,6 +342,11 @@ function init(){
   document.getElementById('btnBackToMatch').addEventListener('click',()=>{
     showScreen('screen-match');
   });
+
+  const btnExport = document.getElementById('btnExportPDF');
+  if(btnExport){
+    btnExport.addEventListener('click', exportFinalPDF);
+  }
 
   document.getElementById('btnSaveScores').addEventListener('click',saveScoresFromModal);
 
@@ -786,6 +793,68 @@ function renderScoreboard(){
   });
   table.appendChild(tbody);
   wrap.appendChild(table);
+}
+
+// ---- EXPORT PDF ----
+function exportFinalPDF(){
+  // Feedback imediat că s-a apăsat butonul
+  showAlert('Se generează fișierul PDF cu clasamentul final...');
+
+  try{
+    // Compatibilitate: jsPDF poate fi expus ca window.jspdf.jsPDF sau window.jsPDF
+    const jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF || null);
+    if(!jsPDFCtor){
+      showAlert('Biblioteca jsPDF nu este încărcată. Verifică conexiunea la internet și încearcă din nou.');
+      return;
+    }
+
+    const doc = new jsPDFCtor();
+
+    const title = 'Rentz – Clasament Final';
+    const today = new Date().toLocaleDateString('ro-RO');
+
+    doc.setFontSize(18);
+    doc.text(title, 105, 20, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.text('Data: ' + today, 105, 28, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text('Număr jucători: ' + players.length, 14, 40);
+    doc.text('Runde totale: ' + totalRounds, 14, 47);
+
+    doc.setFontSize(14);
+    doc.text('Clasament final', 14, 62);
+
+    doc.setFontSize(12);
+    let y = 72;
+
+    const ranking = players
+      .map((p, idx) => ({ name: p.name, score: scoresPerPlayer[idx] || 0 }))
+      .sort((a, b) => b.score - a.score);
+
+    ranking.forEach((r, i) => {
+      const scoreTxt = (r.score > 0 ? '+' : '') + r.score;
+      doc.text((i + 1) + '. ' + r.name + ' — ' + scoreTxt, 14, y);
+      y += 8;
+    });
+
+    doc.setFontSize(10);
+    doc.text('Clasament generat automat de aplicația Rentz Scoruri', 105, 285, { align: 'center' });
+
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = 'clasament_rentz.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(pdfUrl);
+  }catch(e){
+    console.error('exportFinalPDF error', e);
+    showAlert('A apărut o eroare la generarea PDF-ului. Încearcă din nou.');
+  }
 }
 
 // ---- INIT ----
