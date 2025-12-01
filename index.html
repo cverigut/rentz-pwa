@@ -81,6 +81,9 @@
       <span class="muted">Continuă pentru a introduce numele.</span>
       <button class="btn primary" id="btnToNames">Continuă →</button>
     </div>
+    <div style="margin-top:8px">
+      <button class="btn ghost small" id="btnResume" style="display:none;">Reia joc salvat</button>
+    </div>
   </div>
 
   <!-- Screen 2: nume jucători -->
@@ -145,7 +148,10 @@
         <div class="muted">Runda <span id="roundIndex">1</span> / <span id="roundTotal">1</span></div>
         <div style="font-weight:700;margin-top:2px">La alegere: <span id="currentPlayerName">-</span></div>
       </div>
-      <button class="btn ghost small" id="btnShowScore">Vezi scor</button>
+      <div class="flex">
+        <button class="btn ghost small" id="btnManualSave">💾 Salvează meciul</button>
+        <button class="btn ghost small" id="btnShowScore">Vezi scor</button>
+      </div>
     </div>
 
     <div class="card" style="margin-top:10px">
@@ -202,6 +208,91 @@ let roundHistory = [];
 let scoresPerPlayer = [];
 
 const palette = ['#ef4444','#22c55e','#3b82f6','#f97316','#8b5cf6','#06b6d4'];
+const STORAGE_KEY = 'rentz_match_state_v1';
+
+function saveMatchState(){
+  try{
+    if(typeof localStorage === 'undefined') return;
+    const simplePicks = {};
+    Object.keys(picksByPlayer || {}).forEach(k=>{
+      simplePicks[k] = Array.from(picksByPlayer[k] || []);
+    });
+    const state = {
+      numPlayers,
+      players,
+      allGames,
+      totalRounds,
+      currentRoundIndex,
+      picksByPlayer: simplePicks,
+      roundHistory,
+      scoresPerPlayer
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){ console.error('saveMatchState error', e); }
+}
+
+function loadMatchState(){
+  try{
+    if(typeof localStorage === 'undefined') return false;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const state = JSON.parse(raw);
+    if(!state || !state.players || !state.allGames) return false;
+    numPlayers = state.numPlayers || state.players.length;
+    players = state.players || [];
+    allGames = state.allGames || [];
+    activeGames = allGames.filter(g=>g.active);
+    totalRounds = state.totalRounds || (activeGames.length * numPlayers);
+    currentRoundIndex = state.currentRoundIndex || 0;
+    scoresPerPlayer = state.scoresPerPlayer || new Array(numPlayers).fill(0);
+    picksByPlayer = {};
+    if(state.picksByPlayer){
+      Object.keys(state.picksByPlayer).forEach(k=>{
+        picksByPlayer[k] = new Set(state.picksByPlayer[k] || []);
+      });
+    } else {
+      for(let i=0;i<numPlayers;i++) picksByPlayer[i] = new Set();
+    }
+    roundHistory = state.roundHistory || [];
+    const rt = document.getElementById('roundTotal');
+    if(rt) rt.textContent = totalRounds;
+    updateRoundsSummary();
+    return true;
+  }catch(e){ console.error('loadMatchState error', e); return false; }
+}
+
+function setupResumeButton(){
+  try{
+    if(typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const btn = document.getElementById('btnResume');
+    if(!btn) return;
+    if(!raw){
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = 'inline-flex';
+    btn.addEventListener('click',()=>{
+      const ok = loadMatchState();
+      if(ok){
+        showScreen('screen-match');
+        updateMatchUI();
+      } else {
+        showAlert('Nu s-a putut încărca jocul salvat.');
+      }
+    });
+  }catch(e){ console.error('setupResumeButton error', e); }
+}
+
+function setupManualSave(){
+  const btn = document.getElementById('btnManualSave');
+  if(!btn) return;
+  btn.addEventListener('click',()=>{
+    saveMatchState();
+    showAlert('Meciul a fost salvat pe acest dispozitiv.');
+  });
+}
+
 
 function init(){
   // număr jucători
@@ -251,6 +342,9 @@ function init(){
   });
 
   document.getElementById('btnSaveScores').addEventListener('click',saveScoresFromModal);
+
+  setupResumeButton();
+  setupManualSave();
 
   updateRoundsSummary();
 }
@@ -441,6 +535,7 @@ function startMatch(){
 
   document.getElementById('roundTotal').textContent = totalRounds;
   updateMatchUI();
+  saveMatchState();
   showScreen('screen-match');
 }
 
@@ -648,7 +743,12 @@ function saveScoresFromModal(){
   hideScoresModal();
 
   currentRoundIndex++;
+  saveMatchState();
   if(currentRoundIndex >= totalRounds){
+    try{
+      if(typeof localStorage !== 'undefined'){ localStorage.removeItem(STORAGE_KEY); }
+    }catch(e){ console.error('clear storage error', e); }
+
     renderScoreboard();
     showScreen('screen-score');
   } else {
