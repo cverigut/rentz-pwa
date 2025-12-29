@@ -303,6 +303,7 @@ function init(){
       document.querySelectorAll('#screen-players-count .seg button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       numPlayers = Number(btn.dataset.val);
+      normalizeRentzForPlayerCount();
       updateRoundsSummary();
     });
   });
@@ -407,7 +408,23 @@ function ensureDefaultGames(){
     {id:'atu',name:'Atu',type:'+',total:240,active:true,builtin:true},
     {id:'tenclubs',name:'10 de Trefla',type:'+',total:100,active:false,builtin:true}
   ];
+  normalizeRentzForPlayerCount();
 }
+
+
+function normalizeRentzForPlayerCount(){
+  const rentz = allGames.find(g => g.id === 'rentz');
+  if(!rentz) return;
+
+  if(!rentz.rentzValues) rentz.rentzValues = [310,250,200,150,100,50];
+
+  // Ensure it has at least 6 values stored (so switching back to 6 works)
+  while (rentz.rentzValues.length < 6) rentz.rentzValues.push(0);
+
+  // Total should match ONLY the first numPlayers places
+  rentz.total = rentz.rentzValues.slice(0, numPlayers).reduce((s,v)=>s + Number(v||0), 0);
+}
+
 
 function renderGamesTable(){
   const tb = document.getElementById('gamesTbody');
@@ -456,7 +473,7 @@ function renderGamesTable(){
     } else {
       // Rentz: 6 rânduri, câte unul per loc
       if(!g.rentzValues) g.rentzValues = [310,250,200,150,100,50];
-      for(let place=1; place<=6; place++){
+      for(let place=1; place<=numPlayers; place++){
         const tr = document.createElement('tr');
 
         const tdActive = document.createElement('td');
@@ -485,7 +502,7 @@ function renderGamesTable(){
         inp.value = g.rentzValues[place-1] || 0;
         inp.addEventListener('input',()=>{
           g.rentzValues[place-1] = Number(inp.value||0);
-          g.total = g.rentzValues.reduce((s,v)=>s+v,0);
+          normalizeRentzForPlayerCount();
           updateRoundsSummary();
         });
         tdTotal.appendChild(inp);
@@ -629,13 +646,16 @@ function onChooseGame(){
 
 function openScoresModal(game){
   document.getElementById('modalTitle').textContent = `Scoruri pentru jocul: ${game.name}`;
-  document.getElementById('modalGameInfo').textContent = game.id === 'rentz' && game.rentzValues ? `Locuri: ${game.rentzValues.join(', ')}` : `Total joc: ${game.total}`;
+  document.getElementById('modalGameInfo').textContent =
+    (game.id === 'rentz' && game.rentzValues)
+      ? `Locuri: ${game.rentzValues.slice(0, numPlayers).join(', ')}`
+      : `Total joc: ${game.total}`;
 
   const area = document.getElementById('modalScores');
   area.innerHTML='';
 
   if(game.id === 'rentz'){
-    // introducem LOCUL (1-6) pentru fiecare jucător
+    // introducem LOCUL (1-numPlayers) pentru fiecare jucător
     players.forEach((p,idx)=>{
       const row = document.createElement('div');
       row.className = 'row';
@@ -645,15 +665,15 @@ function openScoresModal(game){
       inp.type = 'number';
       inp.inputMode = 'numeric';
       inp.min = '1';
-      inp.max = '6';
-      inp.placeholder = 'loc (1-6)';
+      inp.max = String(numPlayers);
+      inp.placeholder = `loc (1-${numPlayers})`;
       inp.dataset.index = idx;
       right.appendChild(inp);
       row.appendChild(left);
       row.appendChild(right);
       area.appendChild(row);
     });
-    document.getElementById('modalHint').textContent = 'Introdu locul (1-6) pentru fiecare jucător. Fiecare loc trebuie folosit o singură dată.';
+    document.getElementById('modalHint').textContent = `Introdu locul (1-${numPlayers}) pentru fiecare jucător. Fiecare loc trebuie folosit o singură dată.`;
   } else {
     players.forEach((p,idx)=>{
       const row = document.createElement('div');
@@ -679,6 +699,7 @@ function openScoresModal(game){
   document.getElementById('modalBackdrop').classList.remove('hidden');
 }
 
+
 function hideScoresModal(){
   document.getElementById('modalBackdrop').classList.add('hidden');
 }
@@ -693,36 +714,41 @@ function saveScoresFromModal(){
   let perPlayer = new Array(players.length).fill(0);
 
   if(game.id === 'rentz'){
-    // citim locurile 1-6
     const places = inputs.map(inp=>Number(inp.value||0));
     const used = new Set();
+
     for(const pl of places){
-      if(pl < 1 || pl > 6){
-        showAlert('Toate locurile la Rentz trebuie să fie între 1 și 6.');
+      if(pl < 1 || pl > numPlayers){
+        showAlert(`Toate locurile la Rentz trebuie să fie între 1 și ${numPlayers}.`);
         return;
       }
       if(used.has(pl)){
-        showAlert('Fiecare loc (1-6) poate fi folosit o singură dată.');
+        showAlert(`Fiecare loc (1-${numPlayers}) poate fi folosit o singură dată.`);
         return;
       }
       used.add(pl);
     }
-    if(used.size !== 6){
-      showAlert('Trebuie folosite toate locurile de la 1 la 6, câte o singură dată.');
+
+    if(used.size !== numPlayers){
+      showAlert(`Trebuie folosite toate locurile de la 1 la ${numPlayers}, câte o singură dată.`);
       return;
     }
-    // mapăm loc -> valoare Rentz
+
     const vals = game.rentzValues || [310,250,200,150,100,50];
-    perPlayer = places.map(pl=> vals[pl-1] || 0);
-    const sumAbs = perPlayer.reduce((s,v)=>s+Math.abs(v),0);
-    if(sumAbs !== game.total){
-      const diff = game.total - sumAbs;
-      const msg = diff>0 ?
-        ('Totalul Rentz este cu ' + diff + ' puncte MAI MIC decât totalul setat ('+game.total+').') :
-        ('Totalul Rentz este cu ' + (-diff) + ' puncte MAI MARE decât totalul setat ('+game.total+').');
-      showAlert(msg);
+
+    // mapăm loc -> valoare Rentz (doar primele numPlayers locuri)
+    perPlayer = places.map(pl=> Number(vals[pl-1] || 0));
+
+    const expectedRentzTotal = vals.slice(0, numPlayers).reduce((s,v)=>s + Number(v||0), 0);
+    const sum = perPlayer.reduce((s,v)=>s + v,0);
+
+    if(sum !== expectedRentzTotal){
+      showAlert(`Totalul Rentz trebuie să fie ${expectedRentzTotal}. Acum este ${sum}.`);
       return;
     }
+
+    // păstrăm totalul jocului sincronizat cu numărul de jucători
+    game.total = expectedRentzTotal;
   } else {
     // joc normal: valori de punctaj
     const rawVals = inputs.map(inp=>{
